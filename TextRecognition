@@ -1,0 +1,289 @@
+# -*- coding: utf-8 -*-
+import sys
+import os
+import time
+import argparse
+import pytesseract
+import torch
+import torch.nn as nn
+import torch.backends.cudnn as cudnn
+from torch.autograd import Variable
+
+from PIL import Image
+import cv2
+from skimage import io
+import numpy as np
+import shutil
+import json
+import zipfile
+from pytesseract import image_to_string
+from PIL import Image, ImageEnhance, ImageFilter
+import matplotlib.pyplot as plt
+fig=plt.figure()
+%matplotlib inline
+
+def tesser_output(img_dir):
+    im = Image.open(img_dir)
+    enhancer = ImageEnhance.Contrast(im)
+    im = enhancer.enhance(4)
+    enhancer = ImageEnhance.Sharpness(im)
+    im = enhancer.enhance(2)
+    enhancer = ImageEnhance.Brightness(im)
+    im = enhancer.enhance(1)
+    im = im.filter(ImageFilter.UnsharpMask())
+    im.save('/home/tgt/case2.png')
+    text1 = pytesseract.image_to_string(Image.open("/home/tgt/case2.png"))
+    #print(text1)
+    return text1
+b= 0
+def ExtractingImageId(img,filename,strResult,img_file,k,a):
+    if len(strResult)>0:
+        newarr =[]
+        info1 = ""
+        info2 = ""
+        #img = cv2.imread(img)
+        height = img.shape[0]
+        width = img.shape[1]
+        info_list = []
+        mask = np.zeros((height, width), dtype=np.uint8)
+        #print(strResult)
+        arr = strResult.split(',')
+        for element in arr:
+            newarr.append(int(element))
+        newarr =map(abs, newarr)
+        [h1,w1,h2,w2,h3,w3,h4,w4] = newarr
+        #print(newarr)
+        height_list = [h1,h2,h3,h4]
+        width_list =[w1,w2,w3,w4]
+        if max(height_list) - min(height_list)>40 and max(width_list) - min(width_list)>40:
+            points = np.array([[[h1,w1],[h2,w2],[h3,w3],[h4,w4]]])
+            cv2.fillPoly(mask, points, (255))
+            res = cv2.bitwise_and(img,img,mask = mask)
+            rect = cv2.boundingRect(points) # returns (x,y,w,h) of the rect
+            cropped = img[rect[1]: rect[1] + rect[3], rect[0]: rect[0] + rect[2]]
+            plt.imshow(cropped)
+            create_dir = "/home/tgt/sample_labels/"+filename 
+            if os.path.exists(create_dir):
+                cv2.imwrite(create_dir+"/"+str(a)+".png",cropped)
+            else:
+                os.mkdir(create_dir)
+                cv2.imwrite(create_dir+"/"+str(a)+".png",cropped)
+            #img_dir = "/home/tgt/sample_labels/"+filename+"_"+str(k)+"_"+str(a)+".png"
+            #img_dir ="/home/tgt/sample_labels/"+str(a)+".png"
+            #cv2.imwrite(img_dir,cropped)
+#             colorImage  = Image.open(create_dir+"/"+str(a)+".png")
+#             transposed  = colorImage.transpose(Image.ROTATE_90)
+            #plt.imshow(transposed)
+#             transposed.save("mesh_trans.jpg")
+            info1 = pytesseract.image_to_string(Image.open(create_dir+"/"+str(a)+".png"))
+            info2 = tesser_output(create_dir+"/"+str(a)+".png")
+#             info3 = pytesseract.image_to_string(Image.open("mesh_trans.jpg"))
+            info1 =''.join(e for e in info1 if e.isalnum())
+            info2 =''.join(e for e in info2 if e.isalnum())
+#             info3 =''.join(e for e in info3 if e.isalnum())
+#             info1 = info1.replace(',','')
+#             info2 = info2.replace(',','')
+#             info3 = info3.replace(',','')
+#             info1 = info1.replace('{','')
+#             info2 = info2.replace('{','')
+#             info3 = info3.replace('{','')
+#             info1 = info1.replace(']','')
+#             info2 = info2.replace(']','')
+#             info3 = info3.replace(']','')
+            print("info1 result",info1,"====>",filename)
+            print("info2 result",info2,"====>",filename)
+#             print("info3 result",info3,"====>",filename)
+            
+            if len(info1)>=4 and info1.isdigit():
+                
+                crt_dir_with_label ="/home/tgt/label_names/"+info1
+#                 source = img_file
+#                 # Destination path  
+#                 destination = crt_dir_with_label+"/"
+#                 shutil.copy(source,destination)
+                if os.path.exists(crt_dir_with_label):
+                    source = img_file
+                    # Destination path  
+                    destination = crt_dir_with_label+"/"
+                    shutil.copy(source,destination)
+                else:
+                    
+                    os.mkdir(crt_dir_with_label)
+                    source = img_file
+                    destination = crt_dir_with_label+"/"
+                    shutil.copy(source,destination)
+            if len(info2)>=4 and info2.isdigit() :
+                crt_dir_with_label ="/home/tgt/label_names/"+info2
+#                 source = img_file
+#                 # Destination path  
+#                 destination = crt_dir_with_label+"/"
+#                 shutil.copy(source,destination)
+                if os.path.exists(crt_dir_with_label):
+                    source = img_file
+                    destination = crt_dir_with_label+"/"
+                    shutil.copy(source,destination)
+                else:
+                    os.mkdir(crt_dir_with_label)
+                    source = img_file
+                    destination = crt_dir_with_label+"/"
+#             if len(info3)>=4 and info3.isdigit() :
+#                 crt_dir_with_label ="/home/tgt/label_names/"+info3
+# #                 source = img_file
+# #                 # Destination path  
+# #                 destination = crt_dir_with_label+"/"
+# #                 shutil.copy(source,destination)
+#                 if os.path.exists(crt_dir_with_label):
+#                     source = img_file
+#                     destination = crt_dir_with_label+"/"
+#                     shutil.copy(source,destination)
+#                 else:
+#                     os.mkdir(crt_dir_with_label)
+#                     source = img_file
+#                     destination = crt_dir_with_label+"/"
+#                     shutil.copy(source,destination)
+#             else:
+                pass
+        else:
+            print("info not valid")
+    
+    else:
+        pass
+    
+    
+    
+    plt.show()
+    info_list = [i for i in info_list if i]
+    return (info1,info2,info_list)
+
+
+def saveResult(img_file,k, img, boxes, dirname='./result/', verticals=None, texts=None):
+    
+    try:
+        img = np.array(img)
+        coor_list = []
+        # make result file list
+        filename, file_ext = os.path.splitext(os.path.basename(img_file))
+        # result directory
+        #res_file = dirname + "res_" + filename + '.txt'
+        res_img_file = dirname + "res_" + filename + '.jpg'
+        a=0
+        for i, box in enumerate(boxes):
+                poly = np.array(box).astype(np.int32).reshape((-1))
+                strResult = ','.join([str(p) for p in poly]) + '\r\n'
+                ExtractingImageId(img,filename,strResult,img_file,str(k),str(a))
+                a+=1
+                poly = poly.reshape(-1, 2)
+                cv2.polylines(img, [poly.reshape((-1, 1, 2))], True, color=(0, 0, 255), thickness=2)
+                ptColor = (0, 255, 255)
+                if verticals is not None:
+                    if verticals[i]:
+                        ptColor = (50,205,50)
+
+                if texts is not None:
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 0.5
+                    cv2.putText(img, "{}".format(texts[i]), (poly[0][0], poly[0][1]), font, font_scale, (0, 0, 0), thickness=1.5)
+
+                    cv2.putText(img, "{}".format(texts[i]), tuple(poly[0]), font, font_scale, (50,205,50), thickness=1.5)
+        cv2.imwrite(res_img_file, img)
+        
+    except Exception as e :
+        print("issue with existing image",e)
+
+from collections import OrderedDict
+
+def copyStateDict(state_dict):
+    if list(state_dict.keys())[0].startswith("module"):
+        start_idx = 1
+    else:
+        start_idx = 0
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        name = ".".join(k.split(".")[start_idx:])
+        new_state_dict[name] = v
+    return new_state_dict
+
+def str2bool(v):
+    return v.lower() in ("yes", "y", "true", "t", "1")
+
+
+""" For test images in a folder """
+
+image_list, _, _ = get_files("/home/tgt/Desktop/Sample")
+#image_list, _, _ = get_files("/home/tgt/tested_bip/archieved")
+
+result_folder = '/home/tgt/Desktop/result/'
+if not os.path.isdir(result_folder):
+    os.mkdir(result_folder)
+
+def test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly):
+    t0 = time.time()
+
+    # resize
+    img_resized, target_ratio, size_heatmap = resize_aspect_ratio(image, 1280, interpolation=cv2.INTER_LINEAR, mag_ratio=1.5)
+    ratio_h = ratio_w = 1 / target_ratio
+
+    # preprocessing
+    x = normalizeMeanVariance(img_resized)
+    x = torch.from_numpy(x).permute(2, 0, 1)    # [h, w, c] to [c, h, w]
+    x = Variable(x.unsqueeze(0)) # [c, h, w] to [b, c, h, w]
+    #print(x)
+    # forward pass
+    y, _ = net(x)
+
+    # make score and link map
+    score_text = y[0,:,:,0].cpu().data.numpy()
+    score_link = y[0,:,:,1].cpu().data.numpy()
+
+    t0 = time.time() - t0
+    t1 = time.time()
+
+    # Post-processing
+    boxes, polys = getDetBoxes(score_text, score_link, text_threshold, link_threshold, low_text, poly)
+
+    # coordinate adjustment
+    boxes = adjustResultCoordinates(boxes, ratio_w, ratio_h)
+    #print("boxes",boxes)
+    
+    polys = adjustResultCoordinates(polys, ratio_w, ratio_h)
+    #print("poly",polys)
+    for k in range(len(polys)):
+        if polys[k] is None: polys[k] = boxes[k]
+
+    t1 = time.time() - t1
+
+    # render results (optional)
+    render_img = score_text.copy()
+    render_img = np.hstack((render_img, score_link))
+    ret_score_text =cvt2HeatmapImg(render_img)
+
+    if False : print("\ninfer/postproc time : {:.3f}/{:.3f}".format(t0, t1))
+
+    return boxes, polys, ret_score_text
+
+
+
+if __name__ == '__main__':
+    net = CRAFT()     # initialize
+    net.load_state_dict(copyStateDict(torch.load("/home/tgt/Downloads/craft_mlt_25k.pth", map_location='cpu')))
+
+    net.eval()
+    t = time.time()
+    try:
+        for k, image_path in enumerate(image_list):
+            print("Test image {:d}/{:d}: {:s}".format(k+1, len(image_list), image_path), end='\r')
+            print("k ",k)
+            image = loadImage(image_path)
+            print(image.shape)
+            bboxes, polys, score_text = test_net(net, image, 0.7, 0.4, 0.4, True, True)
+            #print("bboxes",bboxes)
+            #print("polys",polys)
+            # save score text
+            filename, file_ext = os.path.splitext(os.path.basename(image_path))
+            saveResult(image_path,k, image[:,:,::-1], polys, dirname=result_folder)
+            
+    except Exception as e :
+        print("exception at loading image",e)
+        pass
+
+    print("elapsed time : {}s".format(time.time() - t))
